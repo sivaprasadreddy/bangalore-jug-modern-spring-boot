@@ -1,0 +1,15 @@
+GET http://localhost:8080/api/bookmarks
+
+###
+GET http://localhost:8080/api/bookmarks/1
+
+###
+POST http://localhost:8080/api/bookmarks
+Content-Type: application/json
+
+{
+  "url": "https://www.google.com",
+  "title": "Google"
+}
+
+
