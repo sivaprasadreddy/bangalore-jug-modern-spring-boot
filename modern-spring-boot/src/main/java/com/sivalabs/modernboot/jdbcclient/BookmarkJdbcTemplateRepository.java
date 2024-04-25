@@ -1,62 +1,57 @@
 package com.sivalabs.modernboot.jdbcclient;
 
 import com.sivalabs.modernboot.models.Bookmark;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Timestamp;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 @Transactional(readOnly = true)
-public class BookmarkRepository {
-    private final JdbcClient jdbcClient;
+class BookmarkJdbcTemplateRepository {
+    private final JdbcTemplate jdbcTemplate;
 
-    BookmarkRepository(JdbcClient jdbcClient) {
-        this.jdbcClient = jdbcClient;
+    BookmarkJdbcTemplateRepository(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     public List<Bookmark> findAll() {
         String sql = "select id, title, url, created_at from bookmarks";
-        return jdbcClient.sql(sql).query(new BookmarkRowMapper()).list();
-        //return jdbcClient.sql(sql).query(Bookmark.class).list();
+        return jdbcTemplate.query(sql, new BookmarkRowMapper());
     }
 
     public Optional<Bookmark> findById(Long id) {
-        String sql = "select id, title, url, created_at from bookmarks where id = :id";
-        //return jdbcClient.sql(sql).param("id", id).query(Bookmark.class).optional();
-
-        // If you want to use your own RowMapper
-        return jdbcClient.sql(sql).param("id", id).query(new BookmarkRowMapper()).optional();
+        String sql = "select id, title, url, created_at from bookmarks where id = ?";
+        return jdbcTemplate.query(sql, new BookmarkRowMapper(), id).stream().findFirst();
     }
 
     @Transactional
     public Long save(Bookmark bookmark) {
         String sql = """
                     insert into bookmarks(title, url, created_at)
-                    values(:title,:url,:createdAt) returning id
+                    values(?,?,?) returning id
                     """;
         KeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbcClient.sql(sql)
-                .param("title", bookmark.title())
-                .param("url", bookmark.url())
-                .param("createdAt", Timestamp.from(bookmark.createdAt()))
-                .update(keyHolder);
+        jdbcTemplate.update(connection -> {
+            PreparedStatement pstmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            pstmt.setString(1, bookmark.title());
+            pstmt.setString(2, bookmark.url());
+            pstmt.setTimestamp(3, java.sql.Timestamp.from(bookmark.createdAt()));
+            return pstmt;
+        }, keyHolder);
         return keyHolder.getKeyAs(Long.class);
     }
 
     @Transactional
     public void update(Bookmark bookmark) {
         String sql = "update bookmarks set title = ?, url = ? where id = ?";
-        int count = jdbcClient.sql(sql)
-                .param(1, bookmark.title())
-                .param(2, bookmark.url())
-                .param(3, bookmark.id())
-                .update();
+        int count = jdbcTemplate.update(sql, bookmark.title(), bookmark.url(), bookmark.id());
         if (count == 0) {
             throw new RuntimeException("Bookmark not found");
         }
@@ -65,7 +60,7 @@ public class BookmarkRepository {
     @Transactional
     public void delete(Long id) {
         String sql = "delete from bookmarks where id = ?";
-        int count = jdbcClient.sql(sql).param(1, id).update();
+        int count = jdbcTemplate.update(sql, id);
         if (count == 0) {
             throw new RuntimeException("Bookmark not found");
         }
