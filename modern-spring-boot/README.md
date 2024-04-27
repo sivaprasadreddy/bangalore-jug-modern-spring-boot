@@ -9,7 +9,11 @@ $ ./mvnw spring-boot:test-run
 ## Run application using Docker Compose in JVM mode
 
 ```shell
-$ ./mvnw spring-boot:build-image
+# Using Buildpacks 
+$ ./mvnw spring-boot:build-image -DskipTests
+# Using Dockerfile
+$ docker build -t sivaprasadreddy/modern-spring-boot .
+
 $ docker compose -f complete.yml up --build -d
 $ docker compose -f complete.yml logs -f
 ```
